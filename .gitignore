@@ -1,0 +1,11 @@
+__pycache__/
+Developement_Tests/quicktest.py
+Developement_Tests/quick_test.py
+*.svg
+*.png
+*.gt
+*.jpg
+*.jpeg
+*.mov
+*.mp4
+*:Zone.Identifier
