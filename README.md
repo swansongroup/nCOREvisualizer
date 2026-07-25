@@ -19,7 +19,7 @@ conda activate graph_viz_env
 
 NODE IMAGES:
 - Images used for nodes in the graph are expected to be in a folder called "Data" using the following naming convention:
-  - node_* --> * = the ID such that *.png is the image file associated with node_*.
+  - node_* --> * = the ID such that \*.png is the image file associated with node_\*.
 - We have provided two sets of images: "Data" holds all images (16) for a 4-site ion channel (protein image), and "Data_Default_Placeholder" which has generic circled number images compatible with up to 64 nodes.
   - An image_generator script has been added to "Data_Default_Placeholder" so one can generate any number of generic numbered node images that they need
   - "Data_Default_Placeholder" is the main fallback if "Data" cannot be found
