@@ -1,4 +1,4 @@
-This repository houses the in-development network graph visualization software to accompany the MsRKM software.
+This repository houses the public releases of nCORE visualizer to accompany the MsRKM software.
 
 Currently, main.py launches a GTK GUI and can process a .csv file to a pandas dataframe, then pass the relevant data to cycle_layout.py to obtain initial coordinates for each state (node) represented in the input file, then load a visualization of the graph to the GUI. Any number of attributes can be added to the graph following the CSV format noted below. Important and recently added features can be seen at the bottom of the README
 
