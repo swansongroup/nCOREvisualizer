@@ -1,17 +1,17 @@
 This repository houses the public releases of nCORE visualizer to accompany the MsRKM software.
 
-Currently, main.py launches a GTK GUI and can process a .csv file to a pandas dataframe, then pass the relevant data to cycle_layout.py to obtain initial coordinates for each state (node) represented in the input file, then load a visualization of the graph to the GUI. Any number of attributes can be added to the graph following the CSV format noted below. Important and recently added features can be seen at the bottom of the README
+Main.py launches a GTK GUI and calls model.py, view.py, and controller.py and initializes class instances for each. nCORE visualizer can process a CSV file to pandas dataframes, then pass the relevant data to cycle_layout.py to obtain initial coordinates for each state (vertex) represented in the input file, then load a visualization of the graph to the GUI. Any number of attributes can be added to the graph following the CSV format noted below. Important and recently added features can be seen at the bottom of the README
 
 DEPENDENCIES:
   - python=3.11
-  - numpy
-  - matplotlib
-  - scipy
   - graph-tool
+  - numpy
+  - scipy
   - pandas
 
 INSTALLATION:
-- Graph-tool must be installed using conda-forge (available for Linux and MacOS systems; WSL must be used for Windows). Within CONFIG.txt, there is an environment file that can be used to install all dependencies as shown below. This will create a conda env named "graph_viz_env" that will be used to run the program. Ensure the .yml file is in cwd, then run
+- Install your conda of choice (miniconda is recommended)
+- Graph-tool must be installed using conda-forge (available for Linux and MacOS systems; WSL must be used for Windows). Within the environment_config/ directory, there is an environment.yml file that can be used to install all dependencies as shown below. This will create a conda env named "graph_viz_env" that will be used to run the program. Ensure the .yml file is in cwd, then run
 ```
 conda env create -f environment.yml
 conda activate graph_viz_env
@@ -19,26 +19,37 @@ conda activate graph_viz_env
 
 NODE IMAGES:
 - Images used for nodes in the graph are expected to be in a folder called "Data" using the following naming convention:
-  - node_* --> * = the ID such that *.png is the image file associated
+  - node_* --> * = the ID such that *.png is the image file associated with node_*.
 - We have provided two sets of images: "Data" holds all images (16) for a 4-site ion channel (protein image), and "Data_Default_Placeholder" which has generic circled number images compatible with up to 64 nodes.
-  - An image_generator script has been added to "Data_Default_Placeholder" so one can generate any number of node images that they need
-  - "Data_Default_Placeholder" is now the main fallback if "Data" cannot be found
+  - An image_generator script has been added to "Data_Default_Placeholder" so one can generate any number of generic numbered node images that they need
+  - "Data_Default_Placeholder" is the main fallback if "Data" cannot be found
 
 RUNNING THE CODE:
 - Install dependencies as noted above
 - Run using: "python3 main.py" as any other Python script
-- Click the "Load File(s)" button to open the file load dialog and choose a .csv file for now (Use the example .CSV provided in the Data directory)
+- Click the "Load File(s)" button to open the file load dialog and choose a CSV file for now (Try the example CSV provided in the Data directory)
 - Ensure "Data" folder exists in cwd and that node images are inside
-- Manipulate the graph using the mouse buttons and keyboard as described in these paragraphs from the graph-tool documentation (https://graph-tool.skewed.de/static/doc/autosummary/graph_tool.draw.GraphWidget.html).
-  >Note that the keybinds require "focus" on the graph window itself -- use tab to ensure you are in the right window.
-  - The graph drawing can be panned by dragging with the middle mouse button pressed. The graph may be zoomed by scrolling with the mouse wheel, or equivalent (if the “shift” key is held, the vertex/edge sizes are scaled accordingly). The layout may be rotated by dragging while holding the “control” key. Pressing the “r” key centers and zooms the layout around the graph. By pressing the “a” key, the current translation, scaling, and rotation transformations are applied to the vertex positions themselves, and the transformation matrix is reset (if this is never done, the given position properties are never modified).
-  - Individual vertices may be selected by pressing the left mouse button. The currently selected vertex follows the mouse pointer. To stop the selection, the right mouse button must be pressed. Alternatively, a group of vertices may be selected by holding the “shift” button while the pointer is dragged, while pressing the left button. The selected vertices may be moved by dragging the pointer with the left button pressed. They may be rotated by holding the “control” key and scrolling with the mouse. If the key “z” is pressed, the layout is zoomed to fit the selected vertices only.
-  - (Use with caution on large networks) If the key “s” is pressed, the dynamic spring-block layout is activated. Vertices that are currently selected are not updated.
+- Manipulate the graph using the mouse buttons and keyboard as described in the graph-tool documentation (https://graph-tool.skewed.de/static/doc/autosummary/graph_tool.draw.GraphWidget.html). An overview is provided below.
+
+*Note: The following keybinds, except as noted require "focus" on the graph window. The keyboard focus defaults to the first GTK box in the GUI layout. Use `Tab` to switch keyboard focus between GTK boxes.*
+
+| Action | Control |
+| :--- | :--- |
+| **Pan** | Drag with `Middle Mouse Button` |
+| **Zoom** | `Scroll Wheel` (Hold `Shift` to scale node/edge sizes) |
+| **Rotate** | Drag while holding `Ctrl` |
+| **Center & Zoom** | Press `r` |
+| **Apply Transform** | Press `a` (Applies current translation/scaling to vertex positions) |
+| **Select Node** | `Left Click` (Right click to stop following pointer) |
+| **Select Group** | Hold `Shift` + drag `Left Click` |
+| **Zoom to Selection** | Press `z` |
+| **Activate dynamic spring-block layout** | (use with caution on large networks) Press `s` (Currently-selected vertices are not updated) |
+| **Search Table** | (for use in any GTK list/table) Press `s` |
 
 CSV FILE FORMAT: 
-- The CSV format has been generalized to handle any type of network with any number of nodes/edges/attributes. These attributes can be edge-level (some specific v1-v2), vertex-level (some specific v1), or path-level (some specific cycle, 0-1-2-0). Below will show exactly what is expected for the CSV file, and the example file can be viewed to supplement your understanding.
+- The CSV format has been generalized to handle any type of cycle-decomposed network with any number of nodes/edges/attributes. These attributes can be edge-level (some specific v1-v2), vertex-level (some specific v1), or path-level (some specific cycle, 0-1-2-0). Below will show exactly what is expected for the CSV file, and the example file can be viewed to supplement your understanding.
 
-- The top row holds all of the identifiers, and each row below is a given cycle within the network (Note that one can use a single row if they do not have a path-driven network.
+- The top row holds all of the identifiers, and each row below is a given cycle within the network.
 
 - Top row: node_id (all node_id cols first), then Flux. These are the only required columns 
   >(Flux controls edge weights; if no flux values for your network, treat it as a weights column). 
@@ -48,32 +59,20 @@ CSV FILE FORMAT:
 	  -  Path Level = `path_<attr>` where `<attr>` can be any `<attr>` describing entire paths
 		-  Edge Level = `edge_<src_id>_<tgt_id>_<attr>`, edges that do not contain a value are handled properly
 		-  Vertex Level = `vertex_<node_id>_<attr>`, proper handling of missing values
-	- Direction has been taken into account and can be added by "path_direction". If not specified, direction will be filled       as "F"
+	- Direction has been taken into account and can be added by "path_direction". If not specified, direction will be filled as "F".
 
 GT FILE FORMAT:
-- .gt is the built-in binary file format provided by Graph-tool. This format is used to save the current layout of a graph, which can be helpful for constructing template layouts or saving work to pick up later. All path-level metadata is now handled properly and will save with the .gt format.
+- .gt is the built-in binary file format provided by Graph-tool. This format is used to save the current layout of a graph, which can be helpful for constructing template layouts or saving work to pick up later. All path-level metadata is handled properly and will save with the .gt format.
 
 CONDITIONAL FILTERING: 
-- AND/OR + NOT filtering options have been added. Due to the nature of the code, OR statements must come first before AND statements. Currently, you cannot mix AND OR statements as shown below:
-  - OR… AND… OR… OR… AND… 
-  >This results in improper grouping of conditions. All OR statements must come before any AND constraints. The only outlier to this rule is the first conditional statement, which can be either AND/OR.
+- AND/OR + NOT filtering options have been added.
 
 TIPS AND TRICKS: 
-- One can create template layouts for graphs that have a matching # of nodes
+- One can create template layouts for graphs that have matching nodes
   - Set up the graph, save as .gt, load that .gt, select "Apply Current Graph Position", and load the graph of interest. The benefit of this is that the template is now reusable
-- One can use the 's' keybind to open a search bar within any table
-
-EXAMPLES FOLDER:
-- The examples folder holds various scripts that can be used
-  - animation_zombies.py is an example script from the graph-tool documentation (https://graphtool.skewed.de/static/doc/demos/animation/animation.html) which shows some of the animation capabilities of graph-tool. animation_zombies_refactor.py is a chatGPT reorganization of the animation_zombies.py script.  When run, each opens a GTK window which then shows an animation of an illness spreading through a social network with the hiding/unhiding of nodes and edges, the use and changing of images for each node, and highlighting of nodes.
-    - animation_sirs.py is another script from the same graph-tool documentation page
-    - LayoutMath_1.1.ipynb is a Jupyter notebook from which the cycle_layout.py script was written.  The main difference is that the Jupyter notebook shows a matplotlib plot of the calculated positions for quick visualization of the script output
-
-DEVELOPMENT TESTS:
-- The Developement_Tests folder contains scripts and data which may or may not run, but may have some useful bits and pieces.
-- In particular, graph-tool_GTK.py is a quick prototype of the GUI with a tabbed main window and the ability to generate and visualize a random graph.
 
 
+----------------------------------------------------------------------------
 Network Cycle-oriented Relational Explorer and Visualizer (nCORE visualizer)
 - Copyright (C) 2026  Tyler G. Southam
 
