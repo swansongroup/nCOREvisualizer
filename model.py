@@ -779,7 +779,6 @@ class GraphModel:
 
             # Edge rows: one row per transition in the path.
             transition_count = len(states) if is_cyclic else max(0,len(states) -1)
-            print(transition_count)
 
             for i in range(transition_count):
                 src = states[i]
