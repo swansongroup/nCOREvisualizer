@@ -496,7 +496,7 @@ class GraphModel:
                 # Trimming Filter Tree Below
                 hidden_vertex_props = {"mask", "size", "init_pos", "pos", "vertex_images", "vertex_sfcs"}
                 hidden_edge_props = {"mask", "weight", "dash_style", "color", "k_fwd", "k_rev", "k_int", "F_net",
-                                    "F_fwd", "F_rev", "is_fls", "is_rls", "cycle_number", "Color_hex"}
+                                    "F_fwd", "F_rev", "is_fls", "is_rls", "cycle_number", "Color_hex", "path_cyclic"}
                 props = [f"Vertex: {p}" for p in g.vp.keys() if p not in hidden_vertex_props] + [f"Edge: {p}" for p in g.ep.keys() if p not in hidden_edge_props]
 
                 self.all_properties.append(props)
@@ -701,8 +701,26 @@ class GraphModel:
             states = [str(node) for node in cycle]
             cycle_number = f"cycle_{row_idx}"
 
+            # For source/sink compatibilty
+            is_cyclic = True
+
+            if "path_cyclic" in source_df.columns and pd.notna(row["path_cyclic"]):
+                value = str(row["path_cyclic"]).strip().lower()
+
+                if value in {"true","t", "yes", "y", "1"}:
+                    is_cyclic = True
+                elif value in {"false","f", "no", "n", "0"}:
+                    is_cyclic = False
+                elif value:
+                    raise ValueError(
+                        f"Invalid path_cyclic value {row['path_cyclic']!r} "
+                        f"in CSV row {row_idx}.")
+
             # path_ID is the readable path sequence.
-            path_ID = "-".join(states + [states[0]]) if states else ""
+            path_ID = (
+            "-".join(states + [states[0]])
+            if states and is_cyclic
+            else "-".join(states) )
 
             # path_direction comes from CSV path_direction if available
             path_direction = "F"
@@ -725,9 +743,12 @@ class GraphModel:
 
             # Path values are stored in df_path and also copied to every edge row.
             path_values = []
+
             for col in path_cols:
                 if col == "path_direction":
                     path_values.append(path_direction)
+                elif col == "path_cyclic":
+                    path_values.append("true" if is_cyclic else "false")
                 elif col in source_df.columns:
                     value = row[col]
                     path_values.append(value if pd.notna(value) else pd.NA)
@@ -757,7 +778,10 @@ class GraphModel:
             path_table_indices.append((path_set_id, path_id))
 
             # Edge rows: one row per transition in the path.
-            for i in range(len(cycle)):
+            transition_count = len(states) if is_cyclic else max(0,len(states) -1)
+            print(transition_count)
+
+            for i in range(transition_count):
                 src = states[i]
                 tgt = states[(i + 1) % len(cycle)]
 

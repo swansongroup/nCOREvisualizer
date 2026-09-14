@@ -43,7 +43,7 @@ import cairo
 class GraphView(Gtk.Window):
     """ Manages the GUI. GTK3 code goes here. """
     def __init__(self, controller):
-        super().__init__(title="nCORE Visualizer")
+        super().__init__(title="nCORE visualizer")
         self.set_default_size(1080, 720)
         self.connect("destroy", Gtk.main_quit)
         self.current_filter_mode = "numeric"
