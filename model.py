@@ -894,7 +894,21 @@ class GraphModel:
 
         # Build a display summary before df_path is discarded
         cycle_summary = []
-        total_flow = float(df_path["Flow"].sum()) if len(df_path) > 0 else 0.0
+
+        if len(df_path) > 0:
+            direction_total_flow = ( df_path.groupby("path_direction")["Flow"].transform("sum"))
+            df_path["flux_pct"] = (df_path["Flow"] / direction_total_flow.replace(0, np.nan)).fillna(0.0)
+        else:
+            df_path["flux_pct"] = pd.Series(dtype=float)
+
+        flux_pct_by_path = {(path_set, path_id): float(row["flux_pct"])
+                            for (path_set, path_id), row in df_path.iterrows()
+                            }
+
+        df_edge["flux_pct"] = [
+            flux_pct_by_path[(row["Path_set"], row["Path_id"])]
+            for _, row in df_edge.iterrows()
+        ]
 
         excluded_path_summary_cols = {
             "States", "State_populations", "State_k_fwd", "State_k_int",
@@ -904,7 +918,6 @@ class GraphModel:
 
         for _, row in df_path.iterrows():
             flow = float(row["Flow"])
-            flux_pct_system = flow / total_flow if total_flow else 0.0
 
             summary_row = {}
 
@@ -918,11 +931,10 @@ class GraphModel:
             summary_row["color"] = str(row["Color_name"]) if "Color_name" in row else str(row["Color"])
             summary_row["color_hex"] = str(row["Color_hex"]) if "Color_hex" in row else ""
             summary_row["flow"] = flow
-            summary_row["flux_pct"] = flux_pct_system
+            summary_row["flux_pct"] = float(row["flux_pct"])
+
             cycle_summary.append(summary_row)
 
-        total_flow = float(df_path["Flow"].sum()) if len(df_path) > 0 else 0.0
-        df_edge["Flux_pct_system"] = df_edge["Flow"] / total_flow if total_flow else 0.0
         init_coords = cl.place_points([row["States"] for _, row in df_path.iterrows()])
         graph = self._initialize_graph_object(df_vertex, df_edge, df_path, init_coords)
         return graph, cycle_summary
