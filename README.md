@@ -67,6 +67,14 @@ GT FILE FORMAT:
 CONDITIONAL FILTERING: 
 - AND/OR + NOT filtering options have been added.
 
+Types of Cycles and How to Implement: 
+- Closed Networks
+  	- A closed network consists only of cyclic paths, either as cycles (no repeating vertices) or walks (with repeats).
+  	- Visualizing closed networks does not require any additional work outside of the input CSV setup, all cycles are implied to be closed and will inherently wrap back to their starting vertice
+- Open Networks
+  	- An open network has at least one path that does not wrap back to its original starting position.
+   	- To visualize open networks, use the header, "path_cyclic" and mark all source-to-sink paths as "F", "False, "0". It is not required to mark cyclic paths because blank values are interpreted as cyclic.  
+
 TIPS AND TRICKS: 
 - One can create template layouts for graphs that have matching nodes
   - Set up the graph, save as .gt, load that .gt, select "Apply Current Graph Position", and load the graph of interest. The benefit of this is that the template is now reusable
