@@ -207,10 +207,21 @@ class GraphView(Gtk.Window):
         display_tab.set_margin_bottom(10)
 
         # Hide isolated verts button
+        display_toggle_box = Gtk.HBox(spacing=12)
+        display_tab.pack_start(display_toggle_box, False, False, 0)
+
         self.hide_isolated_check = Gtk.CheckButton(label="Hide isolated vertices")
-        self.hide_isolated_check.connect("toggled", self.controller.on_hide_isolated_toggled)
-        display_tab.pack_start(self.hide_isolated_check, False, False, 0)
-        
+        self.hide_isolated_check.connect("toggled", self.controller.on_hide_isolated_toggled)        
+        display_toggle_box.pack_start(self.hide_isolated_check, False, False, 0)
+
+        self.line_appearance_check = Gtk.CheckButton(label="Show line appearances")
+        self.line_appearance_check.set_active(True)
+        self.line_appearance_check.set_tooltip_text(
+            "Show RLS/FLS dashed line styles on graph edges"
+        )
+        self.line_appearance_check.connect("toggled", self.controller.on_line_appearance_toggled)
+        display_toggle_box.pack_start(self.line_appearance_check, False, False, 0)
+
         # Cycle table columns
         """ To change either the static or dynamic cycle table layout, edit this list """
 

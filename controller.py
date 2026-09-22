@@ -157,8 +157,10 @@ class GraphController:
 
     def on_save_image(self, widget):
         filename = self.view.filename_entry.get_text()
-        if not filename: return
-        self.model.save_graph_to_image(filename)
+        if not filename: 
+            return
+
+        self.model.save_graph_to_image(filename, show_line_appearances=self.view.line_appearance_check.get_active())
     
     def on_property_selected(self, selection):
         # This logic prevents the signal from firing twice
@@ -368,6 +370,7 @@ class GraphController:
     def _default_graph_ui_state(self):
         return {
             "hide_isolated": False,
+            "show_line_appearances": True,
             "dynamic_cycle_selected_indices": ["color", "flow"],
         }
 
@@ -381,6 +384,7 @@ class GraphController:
         
         self.graph_ui_states[self.model.active_index] = {
             "hide_isolated": self.view.hide_isolated_check.get_active(),
+            "show_line_appearances": self.view.line_appearance_check.get_active(),
         "dynamic_cycle_selected_keys": list(self.view.dynamic_cycle_selected_keys),
         }
 
@@ -397,6 +401,7 @@ class GraphController:
         self._restoring_graph_ui = True
         try:
             self.view.hide_isolated_check.set_active(bool(state.get("hide_isolated", False)))
+            self.view.line_appearance_check.set_active(bool(state.get("show_line_appearance", True)))
             self.view.dynamic_cycle_selected_keys = list(state.get("dynamic_cycle_selected_keys", ["color", "flow"]))
         finally:
             self._restoring_graph_ui = False
@@ -431,12 +436,21 @@ class GraphController:
             ])
 
     def _create_graph_widget(self, g):
-        return gt.GraphWidget(g, pos=g.vp.pos,
-                              vertex_shape="circle", vertex_color=[1, 1, 1, 0],
-                              vertex_fill_color=[1, 1, 1, 0], vertex_size=g.vp.size,
-                              vertex_surface=g.vp.vertex_sfcs, edge_color=g.ep.color,
-                              edge_pen_width=g.ep.weight, edge_dash_style=g.ep.dash_style, edge_end_marker="arrow",
-                              edge_marker_size=30)
+        drawing_kwargs = { "pos": g.vp.pos,
+                        "vertex_shape": "circle",
+                        "vertex_color": [1, 1, 1, 0],
+                        "vertex_fill_color": [1, 1, 1, 0],
+                        "vertex_size": g.vp.size,
+                        "vertex_surface": g.vp.vertex_sfcs, 
+                        "edge_color": g.ep.color,
+                        "edge_pen_width": g.ep.weight, 
+                        "edge_end_marker": "arrow",
+                        "edge_marker_size":30,
+                        }
+        if self.view.line_appearance_check.get_active():
+            drawing_kwargs["edge_dash_style"] = g.ep.dash_style
+
+        return gt.GraphWidget(g, **drawing_kwargs)
     
     def _redraw_current_graph(self):
         if self.model.active_index != -1:
@@ -525,6 +539,24 @@ class GraphController:
 
         self._refresh_current_graph_after_state_change()
         self._save_current_graph_ui_state()
+
+    def on_line_appearance_toggled(self, widget):
+        if self._restoring_graph_ui:
+            return
+        self._rebuild_current_graph_widget()
+        self._save_current_graph_ui_state()
+
+    def _rebuild_current_graph_widget(self):
+        if self.model.active_index == -1:
+            return
+        gv = self.model.get_current_graph(1)
+        if gv is None:
+            return
+
+        widget = self._create_graph_widget(gv)
+        self.graph_widgets[self.model.active_index] = widget
+        self.view.display_graph(widget)
+        self.view.update_dynamic_cycle_summary(self.model.get_current_dynamic_cycle_summary())
     
     def apply_isolated_vertex_visibility(self):
         graph = self.model.get_current_graph(0)

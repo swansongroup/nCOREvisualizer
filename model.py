@@ -953,7 +953,7 @@ class GraphModel:
         graph_to_save.save(filename, fmt='gt')
         return True
 
-    def save_graph_to_image(self, filename):
+    def save_graph_to_image(self, filename, show_line_appearances=True):
         if self.active_index == -1: return False
         graph = self.get_current_graph(1)
         if not graph: return False
@@ -964,14 +964,27 @@ class GraphModel:
         elif filename.endswith(".ps"): filetype = "ps"
         elif not filename.endswith(".svg"): filename += ".svg"
 
-        gt.graph_draw(graph, pos=graph.vp.pos, output_size=(2000, 2000),
-                      output=filename, fmt=filetype, bg_color=None,
-                      vertex_shape="circle", vertex_color=[1, 1, 1, 0],
-                      vertex_fill_color=[1, 1, 1, 0], vertex_size=graph.vp.size,
-                      vertex_surface=graph.vp.vertex_sfcs, edge_color=graph.ep.color,
-                      edge_pen_width=graph.ep.weight, edge_dash_style=graph.ep.dash_style, edge_end_marker="arrow",
-                      edge_marker_size=30)
-        return True
+        drawing_kwargs = {"pos": graph.vp.pos, 
+                    "output_size": (2000, 2000),
+                    "output": filename, 
+                    "fmt": filetype, 
+                    "bg_color": None,
+                    "vertex_shape": "circle", 
+                    "vertex_color": [1, 1, 1, 0],
+                    "vertex_fill_color": [1, 1, 1, 0], 
+                    "vertex_size": graph.vp.size,
+                    "vertex_surface": graph.vp.vertex_sfcs, 
+                    "edge_color": graph.ep.color,
+                    "edge_pen_width": graph.ep.weight, 
+                    "edge_dash_style": graph.ep.dash_style,
+                    "edge_end_marker": "arrow",
+                    "edge_marker_size": 30,
+        }
+
+        if show_line_appearances:
+            drawing_kwargs["edge_dash_style"] = graph.ep.dash_style
+
+        gt.graph_draw(graph, **drawing_kwargs)
     
     def apply_cycle_recolor(self, path_id, path_direction, color_name, color_hex, color_rgba):
         """Recolor every edge belonging to one path_id, path_direction"""
