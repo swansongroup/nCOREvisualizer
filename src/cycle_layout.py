@@ -35,234 +35,633 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import numpy as np
+import math
 
-# Pre-defined centers for each quadrant of 2D space
-quad1_centers = [(2.000, 0.000), (1.414, 1.414), (0.000, 2.000), (4.000, 0.000), (3.696, 1.531),
-                 (2.828, 2.828), (1.531, 3.696), (0.000, 4.000), (6.000, 0.000), (5.796, 1.553),
-                 (5.196, 3.000), (4.243, 4.243), (3.000, 5.196), (1.553, 5.796), (0.000, 6.000),
-                 (8.000, 0.000), (7.846, 1.561), (7.391, 3.061), (6.652, 4.445), (5.657, 5.657),
-                 (4.445, 6.652), (3.061, 7.391), (1.531, 7.846), (0.000, 8.000)]
-quad2_centers = [(-2.000, 0.000), (-1.414, 1.414), (-0.000, 2.000), (-4.000, 0.000), (-3.696, 1.531),
-                 (-2.828, 2.828), (-1.531, 3.696), (-0.000, 4.000), (-6.000, 0.000), (-5.796, 1.553),
-                 (-5.196, 3.000), (-4.243, 4.243), (-3.000, 5.196), (-1.553, 5.796), (-0.000, 6.000),
-                 (-8.000, 0.000), (-7.846, 1.561), (-7.391, 3.061), (-6.652, 4.445), (-5.657, 5.657),
-                 (-4.445, 6.652), (-3.061, 7.391), (-1.531, 7.846), (-0.000, 8.000)]
-quad3_centers = [(-2.000, -0.000), (-1.414, -1.414), (-0.000, -2.000), (-4.000, -0.000), (-3.696, -1.531),
-                 (-2.828, -2.828), (-1.531, -3.696), (-0.000, -4.000), (-6.000, -0.000), (-5.796, -1.553),
-                 (-5.196, -3.000), (-4.243, -4.243), (-3.000, -5.196), (-1.553, -5.796), (-0.000, -6.000),
-                 (-8.000, -0.000), (-7.846, -1.561), (-7.391, -3.061), (-6.652, -4.445), (-5.657, -5.657),
-                 (-4.445, -6.652), (-3.061, -7.391), (-1.531, -7.846), (-0.000, -8.000)]
-quad4_centers = [(2.000, -0.000), (1.414, -1.414), (0.000, -2.000), (4.000, -0.000), (3.696, -1.531),
-                 (2.828, -2.828), (1.531, -3.696), (0.000, -4.000), (6.000, -0.000), (5.796, -1.553),
-                 (5.196, -3.000), (4.243, -4.243), (3.000, -5.196), (1.553, -5.796), (0.000, -6.000),
-                 (8.000, -0.000), (7.846, -1.561), (7.391, -3.061), (6.652, -4.445), (5.657, -5.657),
-                 (4.445, -6.652), (3.061, -7.391), (1.531, -7.846), (0.000, -8.000)]
+EPS = 1e-12
 
+def _ring_positions(radius):
+    count = 4 * (int(round(radius))+1) -4
 
-def generate_polygon_coords(n, mean, cycle_direction, radius=1, center=(0, 0)):
-    """Generates coordinates based on a regular n-sided polygon."""
-    # The number space from 0 to 2pi is offset based on the angle relative to the x-axis of the vector pointing from
-    # the new center to the mean. The start and end points are adjusted before evenly dividing it by n and then
-    # converting those n numbers to 2D points around a cirlce.  The adjusted start and end points effectively leave
-    # an opening in the circle of points, facing the mean.
-    
-    start = 0
-    end = 2 * np.pi
-    offset = 0
-    
-    # for any cycle after the initial cycle, set the start and end to leave an open spot in the polygon 
-    # facing the mean in relation to the posistion of the new center
-    if center != (0,0):
-        vector =  np.array(mean) - np.array(center)
-        offset = np.arctan2(vector[1],vector[0])
-        if n == 1:
-            start = np.pi
-            end = 1.75 * np.pi
-        elif n == 2:
-            start = np.pi / 2
-            end = 1.5 * np.pi
-        else:
-            start = np.pi / 4
-            end = 1.75 * np.pi
-        endpoint = True
-    
-    theta = np.linspace(start + offset, end + offset, n, endpoint=False) # divide the space from start to end by n
-    if cycle_direction == -1: # match the rotation of the new points to the rotation of the existing points
-        theta = theta[::-1]
-    # calculate cartesian coordinates from 
-    x = radius * np.cos(theta) + center[0]
-    y = radius * np.sin(theta) + center[1]
-    return list(zip(x, y))
+    theta = np.linspace(
+        0.0,
+        2.0* np.pi,
+        count,
+        endpoint=False
+                        )
 
-def _generate_center_arc(radius, quadrant):
-    """ Generate new arc of centers for any given quadrant"""
+    return [
+        (
+            float(radius * np.cos(angle)),
+            float(radius * np.sin(angle))
+        )
+        for angle in theta
+    ]
 
-    point_count = int(round(radius)) + 1
-    theta = np.linspace(0, np.pi/2, point_count, endpoint=True)
+def _ensure_rings(rings, count, ring_step):
+    while len(rings) < count:
+        radius = ring_step * (len(rings) + 1)
+        rings.append(_ring_positions(radius))
 
-    x = radius * np.cos(theta)
-    y = radius * np.sin(theta)
+def _regular_polygon(n, center=(0.0, 0.0), radius=1.0):
+    center = np.asarray(center, dtype=float)
 
-    if quadrant == 1:
-        points = zip(x, y)    
-    elif quadrant == 2:
-        points = zip(-x, y)
-    elif quadrant == 3:
-        points = zip(-x, -y)
-    elif quadrant == 4:
-        points = zip(x, -y)
+    theta = np.linspace(
+        0.0,
+        2.0 * np.pi,
+        n,
+        endpoint=False
+    )
+
+    xy = center + radius * np.column_stack(
+        (
+            np.cos(theta),
+            np.sin(theta)
+        )
+    )
+
+    return [tuple(point) for point in xy]
+
+def _open_polygon(n, center, reference, radius=1.0, gap_angle=np.pi/ 2.0):
+    center = np.asarray(center, dtype=float)
+    reference = np.asarray(reference, dtype=float)
+    vector = reference - center
+
+    if np.linalg.norm(vector) < EPS:
+        vector = np.array([-1.0, 0.0])
+
+    offset = np.arctan2(vector[1], vector[0])
+
+    if n == 1:
+        theta = np.array([
+            offset + np.pi
+        ])
+
     else:
-        raise ValueError( f"Invalid quadrant: {quadrant}")
-    
-    return [(float(round(px, 3)), float(round(py, 3))) for px,py in points]
+        theta = np.linspace(
+            offset + gap_angle / 2.0,
+            offset + 2.0 * np.pi - gap_angle / 2.0,
+            n, 
+            endpoint=True
+        )
 
-def _extend_quadrant_centers(centers, quadrant, ring_step=2):
-    """ Append new arc to existing list of centers
-        --- Mutes list in place --- """
+    xy = center + radius * np.column_stack(
+        (
+            np.cos(theta),
+            np.sin(theta)
+        )
+    )
 
-    if centers:
-        outer_radius = max(max(abs(x), abs(y)) for x, y in centers)
-        next_radius = ring_step * (int(round(outer_radius / ring_step)) + 1)
-    
-    new_centers = _generate_center_arc(next_radius, quadrant)
+    return [tuple(point) for point in xy]
 
-    for center in new_centers:
-        if center not in centers:
-            centers.append(center)
-            
-    return centers 
+def _graph_centroid(coords):
+    return np.mean(
+        np.asarray(
+            list(coords.values()),
+            dtype=float
+        ),
+        axis = 0
+    )
 
-def choose_new_center(mean, previous_centers):
-    # calculate closest pre-defined center in lists above based on the average of point1 and point2
-    
-    avg = np.array(mean)    
+def _unit(vector, fallback=(1.0,0.0)):
+    vector = np.asarray(vector, dtype=float)
+    magnitude = np.linalg.norm(vector)
 
-    # find preferred quadrant
-    if mean[0] > 0 and mean[1] >= 0:
-        primary = quad1_centers
-        primary_quadrant = 1
-    elif mean[0] <= 0 and mean[1] > 0:
-        primary = quad2_centers
-        primary_quadrant = 2
-    elif mean[0] < 0 and mean[1] <= 0:
-        primary = quad3_centers
-        primary_quadrant = 3
-    elif mean[0] >= 0 and mean[1] < 0:
-        primary = quad4_centers
-        primary_quadrant = 4
-    else:
-        # Protect against edge case (0,0)
-        primary = quad1_centers
-        primary_quadrant = 1
+    if magnitude < EPS:
+        vector = np.asarray(
+            fallback,
+            dtype=float,
+        )
+        magnitude = np.linalg.norm(vector)
 
-    # Try preferred center first
-    available = [center for center in primary if center not in previous_centers]
+    return vector / magnitude
 
-    if not available:
-        _extend_quadrant_centers(primary, primary_quadrant)
-        available = [center for center in primary if center not in previous_centers]
+def _points_clear(points, coords, min_clearance):
+    if not coords or min_clearance <= 0.0:
+        return True
 
-    if available:
-        cens = np.array(available)
-        differences = np.linalg.norm(cens - avg, axis=1)
-        return available[int(np.argmin(differences))]
+    placed = np.asarray(
+        list(coords.values()),
+        dtype=float
+    )
 
-    # If preferred is exhausted, look to next nearest center
-    all_centers = quad1_centers + quad2_centers + quad3_centers + quad4_centers
-    available = [center for center in all_centers if center not in previous_centers]
-    if not available:
-        raise ValueError("No centers remain in any quadrant")
+    for point in points:
+        point = np.asarray(
+            point,
+            dtype=float
+        )
 
-    cens = np.array(available)
-    differences = list(np.linalg.norm(cens - avg, axis=1))
+        distances = np.linalg.norm(
+            placed - point,
+            axis =1
+        )
 
-    return available[int(np.argmin(differences))]
-    
-def check_cycle_direction(coords, points, center):
-    # check the rotational direction of the existing points
-    
-    cen = np.array(center)
-    angle_sum = 0
+        if np.any(distances < min_clearance):
+            return False
 
-    # check angle between subsequent points using dot product, check direction with cross product.
-    for i in range(0, len(points)-1):
-        v1 = np.array(coords[points[i]]) - cen
-        v2 = np.array(coords[points[i+1]]) - cen
-        dot_product = np.dot(v1,v2)
-        magnitude_v1 = np.linalg.norm(v1)
-        magnitude_v2 = np.linalg.norm(v2)
-        cos_theta = dot_product / (magnitude_v1 * magnitude_v2)
-        angle = np.arccos(cos_theta)
-        cross_product = v1[0] * v2[1] - v1[1] * v2[0]
-        if cross_product < 0:
-            angle = -angle
-        angle_sum += angle #sum angles from dot product corrected for direction
-        
-    # return rotational direction of points based on the summed angles
-    if angle_sum < 0:
-        return -1
-    else:
+    return True
+
+def _side_of_line(
+        point,
+        start,
+        end
+):
+
+    point = np.asarray(point, dtype=float)
+    start = np.asarray(start, dtype=float)
+    end = np.asarray(end, dtype=float)
+
+    edge = end - start
+    relative = point - start
+
+    return float(
+        edge[0] * relative[1] - edge[1] * relative[0]
+    )
+
+def _distance_to_segment(point, start, end):
+
+    point = np.asarray(point, dtype=float)
+    start = np.asarray(start, dtype=float)
+    end = np.asarray(end, dtype=float)
+
+    segment = end - start 
+    length_squared = float(np.dot(segment, segment))
+
+    if length_squared < EPS:
+        return float(np.linalg.norm(point - start))
+
+    projection = float(
+        np.dot(point - start, segment) / length_squared)
+
+    projection = float(np.clip(projection, 0.0, 1.0))
+
+    closest = start + projection * segment
+
+    return float(np.linalg.norm(point - closest))
+
+def _outward_side(start, end, coords):
+    start = np.asarray(start, dtype=float)
+    end = np.asarray(end, dtype=float)
+
+    edge = end - start
+
+    if np.linalg.norm(edge) < EPS:
         return 1
-    
-def place_points(cycles):
-    """Generates coordinates for points based on cycles."""
-    point_list = []
-    point_coords = {}
-    radius = 1
 
-    new_center = (0,0)
-    average = (0,0)
-    old_centers = []
-    
-    for cycle in cycles:
-        # determine which points have already been processed (existing_points)
-        new_points = [p for p in cycle if p not in point_list]
-        existing_points = [p for p in cycle if p in point_list]
+    midpoint = 0.5 * (start + end)
+    outward = midpoint - _graph_centroid(coords)
 
-        # if no new points to plot, move on to next cycle
-        if not new_points:
-          continue
-      
-        # if this is not the first cycle, then choose existing points to calculate mean to choose new center
-        if len(existing_points) > 0:
-            first_index = None
-            last_index = None
-            for i, point in enumerate(point_list):
-                if point in cycle:
-                    if first_index is None:
-                        first_index = i
-                    last_index = i
-            lower = point_list[first_index - 1]
-            upper = point_list[last_index + 1] if last_index < len(point_list)-1 else point_list[0]    
-                
-            p1 = point_coords[lower]
-            p2 = point_coords[upper]
-            average = ((p1[0]+p2[0])/2, (p1[1]+p2[1])/2)
-            new_center = choose_new_center(average, old_centers)
-            
-        # if the cycle currently being processed does not use any already processed points, just use the previous mean
-        elif len(existing_points) == 0 and len(point_list) > 0:
-            new_center = choose_new_center(average, old_centers)
+    left_normal = np.array([
+        -edge[1], edge[0]
+    ])
+
+    if np.dot(left_normal, outward) >= 0.0:
+        return 1
+    return -1
+
+def _weighted_open_side(left_anchor, right_anchor, coords, decay_length):
+    start = coords[left_anchor]
+    end = coords[right_anchor]
+
+    positive_occupancy = 0.0
+    negative_occupancy = 0.0
+
+    for vertex, point in coords.items():
+        if vertex in (left_anchor, right_anchor):
+            continue
+
+        side = _side_of_line(point, start, end)
+
+        if abs(side) < EPS:
+            continue
+
+        distance = _distance_to_segment(point, start, end)
+
+        weight = float(np.exp(-distance/decay_length))
+
+        if side > 0.0: 
+            positive_occupancy += weight
+        else:
+            negative_occupancy += weight
+
+    if positive_occupancy < negative_occupancy:
+        return 1
+
+    if negative_occupancy < positive_occupancy:
+        return -1
+
+    return _outward_side(start, end, coords)
+
+def _new_segments(cycle, coords):
+    existing_indices = [index for index, vertex in enumerate(cycle) if vertex in coords]
+    segments = []
+
+    for position, left_index in enumerate(existing_indices):
+
+        right_index = existing_indices[
+            (position + 1) % len(existing_indices)
+        ]
+
+        new_vertices = []
+        index = (left_index + 1) % len(cycle)
+
+        while index != right_index:
+            new_vertices.append(cycle[index])
+
+            index = (index + 1) % len(cycle)
+
+        if new_vertices:
+            segments.append((cycle[left_index], new_vertices, cycle[right_index]))
+
+    return segments
+
+def _has_one_shared_edge(cycle, coords):
+    indices = [index for index, vertex in enumerate(cycle) if vertex in coords]
+
+    if len(indices) != 2:
+        return False
+
+    first, second = indices
+    cycle_length = len(cycle)
+
+    return (
+        (first + 1) % cycle_length == second or (second + 1) % cycle_length == first
+    )
+
+def _path_length(start, points, end):
+    chain = [np.asarray(
+        start, dtype=float
+    )]
+
+    chain.extend(np.asarray(point, dtype=float) for point in points)
+
+    chain.append(np.asarray(end, dtype=float))
+
+    return float(
+        sum(
+            np.linalg.norm(
+                point_b - point_a
+            )
+            for point_a, point_b in zip(chain, chain[1:])
+        )
+    )
+
+def _find_free_center(
+    coords,
+    rings,
+    used_centers,
+    ring_step,
+    max_rings,
+    build_points,
+    min_clearance,
+    target=None,
+    outward=None,
+    anchor=None
+):
+    if target is None:
+        initial_ring_count = 1
+    else:
+        target = np.asarray(target, dtype=float)
+        initial_ring_count = max(
+            1,
+            int(
+                math.ceil(np.linalg.norm(target) / ring_step)
+            ) + 1
+        )
+    if outward is not None:
+        outward = _unit(outward)
+
+        anchor = np.asarray(anchor, dtype=float)
+
+    _ensure_rings(rings, initial_ring_count, ring_step)
+
+    while True:
+        candidates = []
+        for ring_index, ring in enumerate(rings):
+            for point_index, center in enumerate(ring):
+                if center in used_centers:
+                    continue
+                center_array = np.asarray(center, dtype=float)
+
+                if outward is not None:
+                    displacement = (center_array - anchor)
+
+                    if np.dot(displacement, outward) <= 0.0:
+                        continue
+
+                if not _points_clear(
+                    [center_array], coords, min_clearance
+                ):
+                    continue
+
+                proposed = build_points(center_array)
+
+                if not _points_clear(proposed, coords, min_clearance):
+                    continue
+
+                if target is None:
+                    score = (ring_index, point_index)
+
+                else:
+                    score = (float(np.linalg.norm(center_array - target)), ring_index, point_index)
+                candidates.append(
+                    (
+                        score,
+                        center
+                    )
+                )
+        if candidates:
+            _, selected_center = min(candidates, key=lambda item: item[0])
+            used_centers.add(selected_center)
+
+            return selected_center
+        if len(rings) >= max_rings:
+            raise RuntimeError("No free polygon center could be found")
+
+        _ensure_rings(rings, len(rings) + 1, ring_step)
+
+def _best_segment_group(count, start, end, preferred_side, coords, rings, ring_step, min_clearance, max_rings):
+    start = np.asarray(start, dtype=float)
+    end = np.asarray(end, dtype=float)
+
+    degenerate_anchors = (np.linalg.norm(end - start) < EPS)
+
+    current_extent = max(
+        (
+            np.linalg.norm(np.asarray(point, dtype=float)) for point in coords.values()
+        ),
+        default=0.0
+    )
+
+    initial_ring_count = max(1, int(math.ceil(current_extent / ring_step)) + 1)
+
+    _ensure_rings(rings, initial_ring_count, ring_step)
+
+    while True:
+        best = None
         
-        n = len(new_points)
-        # determine which direction the existing points circle
-        cycle_direction = check_cycle_direction(point_coords, existing_points, new_center)
-        # obtain coordinates for the new points
-        polygon_coords = generate_polygon_coords(n, average, cycle_direction, radius, center=new_center)
+        for ring_index, ring in enumerate(rings):
+            if count > len(ring):
+                continue
 
-        # Update the lists of coordinates, points, and already-used centers
-        for i, point in enumerate(new_points):
-                point_coords[point] = polygon_coords[i]
-                point_list.append(point)
-        old_centers.append(new_center)
+            for window_start in range(len(ring)):
 
-    # shift coordinates to avoid negative coordinates
-    minx = min(point_coords.values(), key=lambda point_coords: point_coords[0])[0]
-    miny = min(point_coords.values(), key=lambda point_coords: point_coords[1])[1]
-    for i in point_coords:
-        point_coords[i] = (point_coords[i][0] - minx, point_coords[i][1] - miny)
-        #print(f"{i}, {point_coords[i][0]}, {point_coords[i][1]}")
+                group = [ring[(window_start + offset) % len(ring)] for offset in range(count)]
+
+                if not _points_clear(group, coords, min_clearance):
+                    continue
+
+                if (not degenerate_anchors and any(preferred_side * _side_of_line(point, start, end) <= EPS for point in group)):
+                    continue
+
+                reverse_group = list(reversed(group))
+
+                forward_cost = _path_length(start, group, end)
+
+                reverse_cost = _path_length(start, reverse_group, end)
+
+                if reverse_cost < forward_cost:
+                    ordered_group = reverse_group
+                    cost = reverse_cost
+                else:
+                    ordered_group = group
+                    cost = forward_cost
+
+                candidate_key = (cost, ring_index, window_start)
+
+                if (best is None or candidate_key < best[0]):
+                    best = (candidate_key, ordered_group)
+
+        if best is not None:       
+            return best[1]
+        
+        if len(rings) >= max_rings:
+            raise RuntimeError("No contigous candidate group could be found for an unplaced segment")
+
+        _ensure_rings(rings, len(rings)+ 1, ring_step)
+
+def place_points_method2(
+        cycles,
+        ring_step=2.0,
+        polygon_radius=1.0,
+        center_spacing=2.0,
+        decay_length=2.0,
+        gap_angle=np.pi / 2.0,
+        min_clearance=0.25,
+        max_rings=100
+):
+    if ring_step <= 0.0:
+        raise ValueError("ring_step must be positive")
+
+
+    if polygon_radius <= 0.0:
+        raise ValueError(
+            "polygon_radius must be positive"
+        )
+
+    if center_spacing <= 0.0:
+        raise ValueError(
+            "center_spacing must be positive"
+        )
+
+    if decay_length <= 0.0:
+        raise ValueError(
+            "decay_length must be positive"
+        )
+
+    if min_clearance < 0.0:
+        raise ValueError(
+            "min_clearance cannot be negative"
+        )
+
+    if max_rings < 1:
+        raise ValueError(
+            "max_rings must be at least 1"
+        )
+
+    coords = {}
+    rings = []
+    used_centers = set()
+
+    for raw_cycle in cycles:
+        cycle = list(raw_cycle)
+
+        if not cycle:
+            continue
+
+        if len(set(cycle)) != len(cycle):
+            raise ValueError("Each cycle must list each vertex once; closure is implied")
+
+        existing = [vertex for vertex in cycle if vertex in coords]
+        new_vertices = [vertex for vertex in cycle if vertex not in coords]
+
+        # if doesn't contribute new verts
+        if not new_vertices:
+            continue
+
+        if len(existing) == 0:
+            if not coords:
+                center = (0.0,0.0) # first cycle
+            else:
+
+                def build_polygon(candidate_center):
+                    return _regular_polygon(len(cycle), candidate_center, polygon_radius)
+
+                center = _find_free_center(
+                    coords=coords,
+                    rings=rings,
+                    used_centers=used_centers,
+                    ring_step=ring_step,
+                    max_rings=max_rings,
+                    build_points=build_polygon,
+                    min_clearance=min_clearance)
+
+            points = _regular_polygon(len(cycle), center, polygon_radius)
+
+            coords.update(dict(zip(cycle, points)))
+
+            continue
+
+        # case 2 where exactly one previously placed vertex exists
+        if len(existing) == 1:
+            anchor = existing[0]
+            anchor_index = cycle.index(anchor)
+
+            ordered_new = (cycle[anchor_index + 1:] + cycle[:anchor_index])
+            anchor_point = np.asarray(
+                coords[anchor], dtype=float
+            )
+
+            graph_center = _graph_centroid(coords)
+
+            outward = _unit(
+                anchor_point - graph_center
+            )
+
+            target = (
+                anchor_point
+                + center_spacing * outward
+            )
+
+            def build_open_polygon(candidate_center):
+                return _open_polygon(
+                    len(ordered_new),
+                    candidate_center,
+                    anchor_point,
+                    polygon_radius,
+                    gap_angle
+                )
+
+            center = _find_free_center(
+                coords=coords,
+                rings=rings,
+                used_centers=used_centers,
+                ring_step=ring_step,
+                max_rings=max_rings,
+                build_points=build_open_polygon,
+                min_clearance=min_clearance,
+                target=target,
+                outward=outward,
+                anchor=anchor_point
+            )
+
+            points = build_open_polygon(
+                center
+            )
+
+            coords.update(
+                dict(
+                    zip(
+                        ordered_new,
+                        points
+                    )
+                )
+            )
+
+            continue
+
+        # Case 3 where exacly one shared edge exists. Use midpoint as ref and build facing outward
+        if _has_one_shared_edge(cycle, coords):
+            segments = _new_segments(cycle, coords)
+
+            (
+                left_anchor, segment, right_anchor
+            ) = segments[0]
+
+            start = np.asarray(coords[left_anchor], dtype=float)
+            end = np.asarray(coords[right_anchor], dtype=float)
+            reference = 0.5 * (start + end)
+            graph_center = _graph_centroid(coords)
+            outward = _unit(reference - graph_center)
+            target = (reference + center_spacing * outward)
+
+            def build_shared_edge_polygon(candidate_center):
+                return _open_polygon(
+                    len(segment),
+                    candidate_center,
+                    reference,
+                    polygon_radius,
+                    gap_angle
+                )
+
+            center = _find_free_center(
+                coords=coords,
+                rings=rings,
+                used_centers=used_centers,
+                ring_step=ring_step,
+                max_rings=max_rings,
+                build_points=build_shared_edge_polygon,
+                min_clearance=min_clearance,
+                target=target,
+                outward=outward,
+                anchor=reference
+            )
+
+            points = build_shared_edge_polygon(center)
+
+            # The geometric point set is fixed, but the segment can
+            # be assigned in either traversal direction.
+            reverse_points = list(reversed(points))
+
+            forward_cost = _path_length(start, points, end)
+
+            reverse_cost = _path_length(start, reverse_points, end)
+
+            if reverse_cost < forward_cost:
+                points = reverse_points
+
+            coords.update(dict(zip(segment, points)))
+
+            continue
+
+        # Case 4: Anything more complicated than the above 3 cases
+        segments = _new_segments(cycle, coords)
+
+        for (left_anchor, segment, right_anchor) in segments:
+            start = coords[left_anchor]
+            end = coords[right_anchor]
+
+            preferred_side = _weighted_open_side(left_anchor, right_anchor, coords, decay_length)
+
+            points = _best_segment_group(
+                count=len(segment),
+                start=start,
+                end=end,
+                preferred_side=preferred_side,
+                coords=coords,
+                rings=rings,
+                ring_step=ring_step,
+                min_clearance=min_clearance,
+                max_rings=max_rings
+            )
+
+            coords.update(dict(zip(segment, points)))
+
+    if not coords:
+        return {}
     
-    # return coordinates for all the points in the processed cycles
-    return point_coords
+    minimum = np.min(np.asarray(list(coords.values()), dtype=float), axis=0)
 
+    return {
+        vertex: tuple(np.asarray(point, dtype=float) - minimum)
+        for vertex, point in coords.items()
+    }

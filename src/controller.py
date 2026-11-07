@@ -157,11 +157,15 @@ class GraphController:
 
     def on_save_image(self, widget):
         filename = self.view.filename_entry.get_text()
-        if not filename: 
+        if not filename or self.model.active_index == -1:
             return
+        gw = self.graph_widgets[self.model.active_index]
+        self.model.save_graph_to_image(
+            filename,
+            show_line_appearances=self.view.line_appearance_check.get_active(),
+            widget=gw,
+        )
 
-        self.model.save_graph_to_image(filename, show_line_appearances=self.view.line_appearance_check.get_active())
-    
     def on_property_selected(self, selection):
         # This logic prevents the signal from firing twice
         current_selection = selection.get_selected_rows()

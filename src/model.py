@@ -40,6 +40,7 @@ import pandas as pd
 import cairo
 import cycle_layout as cl
 import graph_tool.all as gt
+from graph_tool.draw import cairo_draw
 import numpy as np
 from numpy import log as ln
 from numpy import power as np_power
@@ -935,7 +936,7 @@ class GraphModel:
 
             cycle_summary.append(summary_row)
 
-        init_coords = cl.place_points([row["States"] for _, row in df_path.iterrows()])
+        init_coords = cl.place_points_method2([row["States"] for _, row in df_path.iterrows()])
         graph = self._initialize_graph_object(df_vertex, df_edge, df_path, init_coords)
         return graph, cycle_summary
 
@@ -953,38 +954,47 @@ class GraphModel:
         graph_to_save.save(filename, fmt='gt')
         return True
 
-    def save_graph_to_image(self, filename, show_line_appearances=True):
-        if self.active_index == -1: return False
-        graph = self.get_current_graph(1)
-        if not graph: return False
-        
-        filetype = "svg" # Default
-        if filename.endswith(".png"): filetype = "png"
-        elif filename.endswith(".pdf"): filetype = "pdf"
-        elif filename.endswith(".ps"): filetype = "ps"
-        elif not filename.endswith(".svg"): filename += ".svg"
+    def save_graph_to_image(self, filename, show_line_appearances=True, widget=None, png_scale=3):
+        if self.active_index == -1 or widget is None:
+            return False
+        win = widget.get_window()
+        if win is None:
+            return False
 
-        drawing_kwargs = {"pos": graph.vp.pos, 
-                    "output_size": (2000, 2000),
-                    "output": filename, 
-                    "fmt": filetype, 
-                    "bg_color": None,
-                    "vertex_shape": "circle", 
-                    "vertex_color": [1, 1, 1, 0],
-                    "vertex_fill_color": [1, 1, 1, 0], 
-                    "vertex_size": graph.vp.size,
-                    "vertex_surface": graph.vp.vertex_sfcs, 
-                    "edge_color": graph.ep.color,
-                    "edge_pen_width": graph.ep.weight, 
-                    "edge_dash_style": graph.ep.dash_style,
-                    "edge_end_marker": "arrow",
-                    "edge_marker_size": 30,
-        }
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        fmt = ext if ext in ("png", "pdf", "ps", "svg") else "svg"
+        if fmt != ext:
+            filename += ".svg"
 
-        if show_line_appearances:
-            drawing_kwargs["edge_dash_style"] = graph.ep.dash_style
+        w = widget.get_allocated_width()
+        h = widget.get_allocated_height()
 
-        gt.graph_draw(graph, **drawing_kwargs)
+        ox, oy = win.get_position()
+        M = cairo.Matrix(*widget.tmatrix.multiply(widget.smatrix))
+        M = M.multiply(cairo.Matrix(1,0,0,1,-ox,-oy))
+
+        k = 1
+        if fmt == "pdf":
+            srf = cairo.PDFSurface(filename, w, h)
+        elif fmt == "ps":
+            srf = cairo.PSSurface(filename, w, h)
+        elif fmt == "svg":
+            srf = cairo.SVGSurface(filename, w, h)
+        else: # png
+            k = png_scale
+            srf = cairo.ImageSurface(cairo.FORMAT_ARGB32, int(w * k), int(h * k))
+
+        cr = cairo.Context(srf)
+        # cr.set_source_rgb(1, 1, 1); cr.paint()   # uncomment for a white background
+        cr.scale(k, k)
+        cr.transform(M) 
+
+        cairo_draw(widget.g, widget.pos, cr, dict(widget.vprops), dict(widget.eprops), widget.vorder, widget.eorder, widget.nodesfirst, **widget.kwargs)
+
+        if fmt == "png":
+            srf.write_to_png(filename)
+        srf.finish()
+        return True
     
     def apply_cycle_recolor(self, path_id, path_direction, color_name, color_hex, color_rgba):
         """Recolor every edge belonging to one path_id, path_direction"""
